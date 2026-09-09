@@ -10,7 +10,7 @@
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
-    "test": "node --test tests/engine.test.ts tests/worker.test.ts tests/histogram.test.ts",
+    "test": "node --test tests/engine.test.ts tests/worker.test.ts tests/histogram.test.ts tests/timeline.test.ts",
     "typecheck": "tsc --noEmit",
     "experiments": "node tests/experiments.ts",
     "format": "oxfmt"

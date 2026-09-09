@@ -43,7 +43,12 @@ export interface WorldState {
   tracked: number[]; trajectories: Record<number,PersonPoint[]>;
   interventions: {month:number;changes:Partial<SimulationConfig>}[];
 }
-export interface ExperimentRecord {version:1; name:string; savedAt:string; world:WorldState; baseline?:WorldState;}
+export type TimelineEvent =
+  | {month:number;type:'config';changes:Partial<SimulationConfig>}
+  | {month:number;type:'tracking';ids:number[]};
+export interface TimelineArchive {version:1;origin:WorldState;events:TimelineEvent[];}
+export interface TimelineStatus {earliestMonth:number;latestMonth:number;viewMonth:number;historical:boolean;}
+export interface ExperimentRecord {version:1; name:string; savedAt:string; world:WorldState; baseline?:WorldState; timeline?:TimelineArchive; baselineTimeline?:TimelineArchive;}
 export interface BatchRow {seed:string;scenario:string;gini:number;top10:number;maxShare:number;employment:number;upward:number|null;samples:number;cashError:number;}
 export interface Snapshot {
   config:SimulationConfig; month:number; frame:MetricFrame; history:MetricFrame[];
@@ -54,6 +59,7 @@ export type WorkerRequest =
   | {type:'step';months:number}
   | {type:'run';speed:number}
   | {type:'pause'}
+  | {type:'seek';month:number|null}
   | {type:'inspect';id:number}
   | {type:'track';id:number}
   | {type:'export';purpose:'download'|'save'|'branch'}

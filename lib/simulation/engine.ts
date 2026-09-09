@@ -136,7 +136,7 @@ export function stepWorld(w:WorldState):MetricFrame {
     for(let k=0;k<limit*3&&candidates.length<limit;k++){const u=pool[Math.floor(random(w)*pool.length)];if(seen.has(u.owner.id)||u.owner.id===own||u.remaining<EPS)continue;seen.add(u.owner.id);candidates.push(u);}
     const score=(u:Unit)=>u.owner.price/ability(u.owner,s)*(u.owner.id===p.customers[s]?1:1+w.config.switchingCost*(.5+(old?.owner.traits[2]??50)/200));
     candidates.sort((a,b)=>score(a)-score(b));
-    for(const u of candidates){const qty=Math.min(need,u.remaining,budget/u.owner.price,p.cash/u.owner.price);if(qty<EPS)continue;const paid=qty*u.owner.price;p.cash-=paid;p.expense+=paid;budget-=paid;need-=qty;u.remaining-=qty;u.sold+=qty;u.revenue+=paid;got.get(p.id)![s]+=qty;p.customers[s]=u.owner.id;next[s].volume+=qty;next[s].revenue+=paid;ledger.traded+=paid;if(need<EPS||budget<EPS)break;}
+    for(const u of candidates){const qty=Math.min(need,u.remaining,budget/u.owner.price,p.cash/u.owner.price);if(qty<EPS)continue;const paid=Math.min(p.cash,budget,qty*u.owner.price);p.cash-=paid;p.expense+=paid;budget-=paid;need-=qty;u.remaining-=qty;u.sold+=qty;u.revenue+=paid;got.get(p.id)![s]+=qty;p.customers[s]=u.owner.id;next[s].volume+=qty;next[s].revenue+=paid;ledger.traded+=paid;if(need<EPS||budget<EPS)break;}
   }
   for(const u of units){ledger.maxOversell=Math.max(ledger.maxOversell,u.sold-u.offered);u.owner.offered=u.offered;u.owner.sold=u.sold;
     for(let i=0;i<u.members.length;i++){const p=u.members[i];const labor=u.base>EPS?.8*u.revenue*u.bases[i]/u.base:0;const ownership=i===0?.2*u.revenue:0;p.labourIncome=labor;p.ownerIncome=ownership;p.income=labor+ownership;p.cash+=p.income;}

@@ -3,6 +3,7 @@ import {useMemo} from 'react';
 import {AreaChart,Area,LineChart,Line,BarChart,Bar,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer} from 'recharts';
 import type {Snapshot,MetricFrame,Person,PersonPoint} from '@/lib/simulation/types';
 import {wealth} from '@/lib/simulation/engine';
+import {buildWealthHistogram} from '@/lib/simulation/histogram';
 
 export const fmt=(n:number,d=1)=>Number.isFinite(n)?(Math.abs(n)<1e-8?0:n).toLocaleString('zh-CN',{maximumFractionDigits:d}):'—';
 export const pct=(n:number)=>`${(n*100).toFixed(1)}%`;
@@ -20,8 +21,8 @@ export function InequalityChart({history,baseline}:{history:MetricFrame[];baseli
  return <ResponsiveContainer width="100%" height={222} minWidth={0}><AreaChart data={rows} margin={{top:12,right:5,left:-20,bottom:0}}><defs><linearGradient id="giniFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7dae82" stopOpacity={.25}/><stop offset="1" stopColor="#7dae82" stopOpacity={0}/></linearGradient></defs><CartesianGrid {...grid} vertical={false}/><XAxis dataKey="year" tick={tick} axisLine={false} tickLine={false} tickFormatter={x=>`${fmt(x,0)}年`}/><YAxis domain={[0,1]} tick={tick} axisLine={false} tickLine={false}/><Tooltip contentStyle={tip} formatter={v=>fmt(Number(v),3)} labelFormatter={x=>`第 ${fmt(Number(x),1)} 年`}/><Area name="当前世界" type="monotone" dataKey="gini" stroke="#287c63" fill="url(#giniFill)" strokeWidth={2} isAnimationActive={false}/>{baseline&&<Area name="原始规则" dataKey="base" stroke="#a5a58b" strokeDasharray="5 4" fill="none" strokeWidth={2} isAnimationActive={false}/>}</AreaChart></ResponsiveContainer>;
 }
 export function WealthHistogram({people,markets}:{people:Person[];markets:MetricFrame['markets']}){
- const values=people.map(p=>wealth(p,{markets}));const max=Math.max(1,...values);const span=Math.log10(max+1)/16;const bins=Array.from({length:16},(_,i)=>({label:fmt(Math.pow(10,i*span)-1,0),count:0}));for(const x of values)bins[Math.min(15,Math.floor(Math.log10(x+1)/span))].count++;
- return <ResponsiveContainer width="100%" height={210} minWidth={0}><BarChart data={bins} margin={{top:12,right:6,left:-16,bottom:0}}><CartesianGrid {...grid} vertical={false}/><XAxis dataKey="label" tick={tick} axisLine={false} tickLine={false} interval={3}/><YAxis tick={tick} axisLine={false} tickLine={false}/><Tooltip contentStyle={tip} formatter={v=>[`${String(v)} 人`,'人数']} labelFormatter={x=>`财富区间起点 ${String(x)}`}/><Bar dataKey="count" fill="#76a882" radius={[3,3,0,0]} isAnimationActive={false}/></BarChart></ResponsiveContainer>;
+ const {bins:rawBins,invalidCount}=buildWealthHistogram(people.map(p=>wealth(p,{markets})));const bins=rawBins.map(bin=>({...bin,label:fmt(bin.lower,0)}));
+ return <>{invalidCount>0&&<p className="model-note" role="alert">有 {invalidCount} 个异常财富值未计入图表。</p>}<ResponsiveContainer width="100%" height={210} minWidth={0}><BarChart data={bins} margin={{top:12,right:6,left:-16,bottom:0}}><CartesianGrid {...grid} vertical={false}/><XAxis dataKey="label" tick={tick} axisLine={false} tickLine={false} interval={3}/><YAxis tick={tick} axisLine={false} tickLine={false}/><Tooltip contentStyle={tip} formatter={v=>[`${String(v)} 人`,'人数']} labelFormatter={x=>`财富区间起点 ${String(x)}`}/><Bar dataKey="count" fill="#76a882" radius={[3,3,0,0]} isAnimationActive={false}/></BarChart></ResponsiveContainer></>;
 }
 export function MarketHistory({history,kind}:{history:MetricFrame[];kind:'price'|'share'}){
  const rows=history.map(f=>({year:f.month/12,a:kind==='price'?f.markets[0].price:f.markets[0].topShare*100,b:kind==='price'?f.markets[1].price:f.markets[1].topShare*100,c:kind==='price'?f.markets[2].price:f.markets[2].topShare*100}));

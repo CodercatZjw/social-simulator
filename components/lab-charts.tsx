@@ -1,9 +1,11 @@
 'use client';
-import {useMemo} from 'react';
+import {useMemo,useState} from 'react';
 import {AreaChart,Area,LineChart,Line,BarChart,Bar,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer} from 'recharts';
 import type {Snapshot,MetricFrame,Person,PersonPoint} from '@/lib/simulation/types';
 import {wealth} from '@/lib/simulation/engine';
 import {buildWealthHistogram} from '@/lib/simulation/histogram';
+import {TRAITS} from '@/lib/simulation/types';
+import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
 
 export const fmt=(n:number,d=1)=>Number.isFinite(n)?(Math.abs(n)<1e-8?0:n).toLocaleString('zh-CN',{maximumFractionDigits:d}):'—';
 export const pct=(n:number)=>`${(n*100).toFixed(1)}%`;
@@ -11,9 +13,32 @@ const colors=['#d7e1cf','#a0c290','#66a181','#2f806d','#125640'];
 const grid={stroke:'#e9eeeb',strokeDasharray:'3 5'};
 const tip={border:'1px solid #dfe8e0',borderRadius:10,fontSize:12,boxShadow:'0 8px 25px #162f2310'};
 const tick={fontSize:12,fill:'#65766b'};
+const talentViews=[
+ {value:'overall',label:'综合天资 · 六项',axisLabel:'综合天资',indices:[0,1,2,3,4,5],note:'思考、记忆、表达、勤奋、专注、可塑性的等权平均。'},
+ {value:'cognition',label:'认知综合 · 三项',axisLabel:'认知综合',indices:[0,1,2],note:'思考、记忆、表达的等权平均。'},
+ ...TRAITS.map((label,index)=>({value:`trait-${index}`,label,axisLabel:label,indices:[index],note:index>=6?'偏好数值越高，表示越偏好风险或越有耐心，不代表天资更好。':`单独观察${label}与财富的关系。`}))
+];
 export function PopulationPlot({data,onSelect,axis='talent'}:{data:Snapshot;onSelect:(id:number)=>void;axis?:string}){
- const dots=useMemo(()=>{const sorted=data.people.map(p=>wealth(p,{markets:data.frame.markets})).sort((a,b)=>a-b);const cut=[.2,.4,.6,.8].map(x=>sorted[Math.floor(sorted.length*x)]);const max=sorted.at(-1)??100;return data.people.map(p=>{const v=wealth(p,{markets:data.frame.markets});const level=max-(sorted[0]??0)<1e-6?2:cut.findIndex(c=>v<=c);return {p,v,x:48+p.traits[0]*6.4,y:axis==='wealth'?272-Math.log10(1+v)/Math.max(1,Math.log10(1+max))*238:272-p.traits[1]*2.38,c:colors[level<0?4:level]};});},[data.people,data.frame.markets,axis]);
- return <div className="population-plot"><svg viewBox="0 0 730 316" aria-label="个体散点图，点击个体查看详情，也可以在个体列表中查询"><defs><linearGradient id="plotFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f0f5e9"/><stop offset="100%" stopColor="#fbfcfa"/></linearGradient></defs><rect x="48" y="32" width="640" height="240" fill="url(#plotFade)" rx="3"/>{[0,20,40,60,80,100].map(t=><g key={t}><line x1={48+t*6.4} x2={48+t*6.4} y1="32" y2="272" stroke="#dee8da" strokeDasharray="2 5"/><line x1="48" x2="688" y1={272-t*2.4} y2={272-t*2.4} stroke="#dee8da" strokeDasharray="2 5"/><text x={48+t*6.4} y="291" textAnchor="middle" className="axis-label">{t}</text>{axis==='talent'&&<text x="32" y={276-t*2.4} textAnchor="end" className="axis-label">{t}</text>}</g>)}<text x="51" y="17" className="axis-title">{axis==='wealth'?'财富 · 对数刻度':'记忆力'}</text><text x="687" y="311" textAnchor="end" className="axis-title">思考能力</text>{dots.map(({p,v,x,y,c})=><circle key={p.id} cx={x} cy={y} r={data.tracked.includes(p.id)?4:2.35} fill={c} fillOpacity={.65} stroke={data.tracked.includes(p.id)?'#d4ec69':'none'} strokeWidth="2" className="person-dot" onClick={()=>onSelect(p.id)}><title>{`#${p.id} · ${Math.floor(p.age/12)} 岁 · 财富 ${fmt(v)} · 思考 ${fmt(p.traits[0])} · 记忆 ${fmt(p.traits[1])}`}</title></circle>)}</svg><div className="plot-legend"><span>每个点，都是一个人</span><div><span>财富低</span>{colors.map(c=><i key={c} style={{background:c}}/>)}<span>高</span></div></div></div>;
+ const [talentView,setTalentView]=useState('overall');
+ const view=talentViews.find(v=>v.value===talentView)??talentViews[0];
+ const xLabel=axis==='wealth'?view.axisLabel:'思考能力';
+ const dots=useMemo(()=>{
+  const sorted=data.people.map(p=>wealth(p,{markets:data.frame.markets})).sort((a,b)=>a-b);
+  const cut=[.2,.4,.6,.8].map(x=>sorted[Math.floor(sorted.length*x)]);
+  const max=sorted.at(-1)??100;
+  return data.people.map(p=>{
+   const v=wealth(p,{markets:data.frame.markets});
+   const score=axis==='wealth'?view.indices.reduce((sum,i)=>sum+p.traits[i],0)/view.indices.length:p.traits[0];
+   const level=max-(sorted[0]??0)<1e-6?2:cut.findIndex(c=>v<=c);
+   return {p,v,score,x:48+score*6.4,y:axis==='wealth'?272-Math.log10(1+Math.max(0,v))/Math.max(1,Math.log10(1+Math.max(0,max)))*238:272-p.traits[1]*2.38,c:colors[level<0?4:level]};
+  });
+ },[data.people,data.frame.markets,axis,view]);
+ return <div className="population-plot">
+  {axis==='wealth'&&<div className="plot-controls"><label htmlFor="talent-view">横轴指标</label><Select value={talentView} onValueChange={v=>{if(v!==null)setTalentView(String(v));}}><SelectTrigger id="talent-view" className="lab-select"><SelectValue>{view.label}</SelectValue></SelectTrigger><SelectContent>{talentViews.map(v=><SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}</SelectContent></Select></div>}
+  <svg viewBox="0 0 730 316" aria-label={`${xLabel}与${axis==='wealth'?'财富':'记忆力'}散点图，点击个体查看详情，也可以在个体列表中查询`}><defs><linearGradient id="plotFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f0f5e9"/><stop offset="100%" stopColor="#fbfcfa"/></linearGradient></defs><rect x="48" y="32" width="640" height="240" fill="url(#plotFade)" rx="3"/>{[0,20,40,60,80,100].map(t=><g key={t}><line x1={48+t*6.4} x2={48+t*6.4} y1="32" y2="272" stroke="#dee8da" strokeDasharray="2 5"/><line x1="48" x2="688" y1={272-t*2.4} y2={272-t*2.4} stroke="#dee8da" strokeDasharray="2 5"/><text x={48+t*6.4} y="291" textAnchor="middle" className="axis-label">{t}</text>{axis==='talent'&&<text x="32" y={276-t*2.4} textAnchor="end" className="axis-label">{t}</text>}</g>)}<text x="51" y="17" className="axis-title">{axis==='wealth'?'财富 · 对数刻度':'记忆力'}</text><text x="687" y="311" textAnchor="end" className="axis-title">{xLabel}</text>{dots.map(({p,v,score,x,y,c})=><circle key={p.id} cx={x} cy={y} r={data.tracked.includes(p.id)?4:2.35} fill={c} fillOpacity={.65} stroke={data.tracked.includes(p.id)?'#d4ec69':'none'} strokeWidth="2" className="person-dot" onClick={()=>onSelect(p.id)}><title>{`#${p.id} · ${Math.floor(p.age/12)} 岁 · 财富 ${fmt(v)}\n${xLabel} ${fmt(score)}\n${TRAITS.map((name,i)=>`${name} ${fmt(p.traits[i])}`).join(' · ')}`}</title></circle>)}</svg>
+  <div className="plot-legend"><span>每个点，都是一个人</span><div><span>财富低</span>{colors.map(c=><i key={c} style={{background:c}}/>)}<span>高</span></div></div>
+  {axis==='wealth'&&<p className="plot-method">{view.note}使用当前属性，范围 0—100；综合值只用于观察，不参与模拟收益计算。</p>}
+ </div>;
 }
 export function InequalityChart({history,baseline}:{history:MetricFrame[];baseline?:MetricFrame[]}){
  const bm=new Map(baseline?.map(f=>[f.month,f.gini]));const rows=history.map(f=>({year:f.month/12,gini:f.gini,base:bm.get(f.month)}));

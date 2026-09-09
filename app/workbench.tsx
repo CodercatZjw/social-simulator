@@ -1,5 +1,7 @@
 'use client';
 import {useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+// oxlint-disable-next-line import/default -- Vite's worker plugin generates this default constructor.
+import SimulationWorker from '../lib/simulation/worker.ts?worker';
 import {Orbit,Play,Pause,StepForward,FastForward,RotateCcw,Save,Upload,Download,SlidersHorizontal,Users,ChartNoAxesCombined,GitBranch,BookOpen,ArrowUpRight,ChevronRight,Star,Search,ArrowLeft,ArrowRight,Check,LoaderCircle,X,Dna,Wallet,Activity,FlaskConical,Leaf,GraduationCap,Layers} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -46,7 +48,7 @@ export default function Workbench(){
  const [batchYears,setBatchYears]=useState('300'),[batchPopulation,setBatchPopulation]=useState('160');
  const send=(msg:WorkerRequest)=>{setError('');worker.current?.postMessage(msg);};
  useEffect(()=>{
-   const w=new Worker(new URL('../lib/simulation/worker.ts',import.meta.url),{type:'module'});worker.current=w;
+   const w=new SimulationWorker();worker.current=w;
    w.onmessage=async event=>{const m=event.data;
      if(m.type==='snapshot'){setData(m.data);setBaseline(m.baseline);setRunning(m.running);setBusy(!!m.busy);const sig=JSON.stringify(m.data.config);if(sig!==lastConfig.current){lastConfig.current=sig;setDraft({...m.data.config});}}
      else if(m.type==='detail')setDetail(m);
